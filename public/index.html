@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dan Online Compiler</title>
+
+    <!-- Include Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <!-- Include CodeMirror CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .CodeMirror {
+            height: auto;
+            border: 1px solid #ccc;
+            font-size: 14px;
+        }
+        pre {
+            background-color: #f1f1f1;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .error-line {
+            background-color: #ffcccc !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mt-4">Dan C++ Online Compiler</h1>
+
+        <div class="row">
+            <div class="col-md-8">
+                <!-- CodeMirror editor -->
+                <textarea id="cppCode" placeholder="Write your C++ code here..." class="form-control" rows="15"></textarea>
+                <button class="btn btn-primary mt-2" onclick="compileCode()">Compile & Run</button>
+            </div>
+            <div class="col-md-4">
+                <h2>Output</h2>
+                <pre id="output"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include CodeMirror and mode for C++ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/clike/clike.min.js"></script>
+
+    <script>
+        const defaultCode = `#include <iostream>
+
+int main() {
+    std::cout << "Hello, World!";
+    return 0;
+}`;
+        // Initialize CodeMirror editor
+        const editor = CodeMirror.fromTextArea(document.getElementById("cppCode"), {
+            lineNumbers: true,      // Show line numbers
+            mode: "text/x-c++src",  // C++ syntax highlighting
+            theme: "default",       // Default theme
+            tabSize: 4,             // Set tab size to 4 spaces
+            indentWithTabs: true,    // Use tabs for indentation
+            viewportMargin: Infinity,
+            indentUnit: 4,          // Indent with 4 spaces when pressing Enter
+            indentWithTabs: false,
+        });
+
+        editor.on("beforeChange", function (instance, change) {
+            const doc = instance.getDoc();
+            const totalLines = doc.lineCount();
+
+            // Check if the change is a backspace (removing spaces)
+            if (change.origin === "backspace") {
+                const from = change.from;
+                const to = change.to;
+
+                const lineContent = instance.getLine(from.line);
+                const spacesToRemove = lineContent.slice(from.ch, to.ch).match(/^(\s+)/);
+                
+                if (spacesToRemove && spacesToRemove[0].length >= 4) {
+                    change.update({ from: from, to: { line: from.line, ch: from.ch + 4 } });
+                } else if (spacesToRemove && spacesToRemove[0].length > 0) {
+                    const countToRemove = Math.min(4, spacesToRemove[0].length);
+                    change.update({ from: from, to: { line: from.line, ch: from.ch + countToRemove } });
+                }
+            }
+        });
+
+        editor.setValue(defaultCode);
+        editor.setSize(null, "600px");
+        
+        function compileCode() {
+            const cppCode = editor.getValue();
+            
+            fetch("/compile", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ code: cppCode })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("output").textContent = data.output;
+                clearErrorHighlighting();
+
+                if (data.output.includes("error")) {
+                    highlightErrorLine(data.output);
+                }
+            })
+            .catch(error => {
+                document.getElementById("output").textContent = "Error: " + error;
+            });
+        }
+
+        function clearErrorHighlighting() {
+            editor.eachLine((line) => {
+                editor.removeLineClass(line, "background", "error-line");
+            });
+        }
+
+        function highlightErrorLine(compilerOutput) {
+            const errorMatch = compilerOutput.match(/code\.cpp:(\d+):/);
+            if (errorMatch) {
+                const lineNumber = parseInt(errorMatch[1], 10) - 1; // Convert to 0-based index
+                editor.addLineClass(lineNumber, "background", "error-line");
+            }
+        }
+    </script>
+</body>
+</html>
