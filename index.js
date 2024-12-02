@@ -19,7 +19,7 @@ const processQueue = () => {
     isCompiling = true;
     const { cppCode, res } = compilationQueue.shift();
     fs.writeFileSync("code.cpp", cppCode);
-    exec("g++ code.cpp -o output && output", (error, stdout, stderr) => {
+    exec("g++ code.cpp -o ./output && ./output", (error, stdout, stderr) => {
         isCompiling = false;
 
         if (error) {
